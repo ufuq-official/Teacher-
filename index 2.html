@@ -1,0 +1,3361 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة درجات الطلاب</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- إضافة مكتبة SheetJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- إضافة مكتبة jsPDF للتصدير إلى PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --light-color: #ecf0f1;
+            --dark-color: #2c3e50;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        /* زر القائمة */
+        .menu-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1001;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .menu-toggle:hover {
+            background: var(--secondary-color);
+            transform: scale(1.05);
+        }
+
+        /* القائمة المنسدلة */
+        .dropdown-menu {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: white;
+            width: 250px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(-20px);
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .dropdown-menu.active {
+            opacity: 1;
+            transform: translateY(0);
+            visibility: visible;
+        }
+
+        .menu-header {
+            padding: 20px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            text-align: center;
+        }
+
+        .menu-header h3 {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }
+
+        .menu-items {
+            padding: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .dropdown-item {
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-bottom: 1px solid #f0f0f0;
+            text-decoration: none;
+            color: #333;
+            position: relative;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background-color: #f8f9fa;
+            padding-right: 25px;
+            color: var(--secondary-color);
+        }
+
+        .dropdown-item.active {
+            background-color: rgba(52, 152, 219, 0.1);
+            border-right: 4px solid var(--secondary-color);
+            color: var(--secondary-color);
+        }
+
+        .dropdown-item.active::after {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 8px;
+            background-color: var(--secondary-color);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: translateY(-50%) scale(1); }
+            50% { transform: translateY(-50%) scale(1.2); }
+            100% { transform: translateY(-50%) scale(1); }
+        }
+
+        .dropdown-item i {
+            margin-left: 15px;
+            font-size: 1.2rem;
+            width: 25px;
+            text-align: center;
+            transition: transform 0.3s;
+        }
+
+        .dropdown-item:hover i {
+            transform: translateX(-3px);
+        }
+
+        .dropdown-item-text {
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        /* رقائق التنقل */
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .breadcrumb-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            color: var(--primary-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .breadcrumb-item:hover {
+            background: var(--secondary-color);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .breadcrumb-item.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* الرأس */
+        .header {
+            height: 80px;
+            background: linear-gradient(90deg, var(--primary-color) 0%, #1a252f 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-title h1 {
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--secondary-color) 0%, var(--accent-color) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* المحتوى الرئيسي */
+        .content {
+            padding: 30px;
+            min-height: calc(100vh - 80px);
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* بطاقات المعلومات */
+        .cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 1px solid #f0f0f0;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .card-title {
+            font-size: 0.95rem;
+            color: #7f8c8d;
+            font-weight: 600;
+        }
+
+        .card-value {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 10px 0;
+        }
+
+        .card-subtitle {
+            font-size: 0.9rem;
+            color: #95a5a6;
+        }
+
+        .card-icon {
+            width: 55px;
+            height: 55px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        .icon-students { background: linear-gradient(135deg, var(--secondary-color) 0%, #2980b9 100%); }
+        .icon-pass { background: linear-gradient(135deg, var(--accent-color) 0%, #27ae60 100%); }
+        .icon-fail { background: linear-gradient(135deg, var(--danger-color) 0%, #c0392b 100%); }
+        .icon-classes { background: linear-gradient(135deg, var(--warning-color) 0%, #d35400 100%); }
+
+        /* نظام الدرجات المحسن */
+        .grades-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+
+        .grade-tab {
+            padding: 12px 25px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #666;
+            white-space: nowrap;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .grade-tab:hover {
+            border-color: var(--secondary-color);
+            color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+
+        .grade-tab.active {
+            background: var(--secondary-color);
+            border-color: var(--secondary-color);
+            color: white;
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
+        }
+
+        .grade-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .grade-content.active {
+            display: block;
+        }
+
+        .quick-grades {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+        }
+
+        .quick-grades-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .quick-grades-header h3 {
+            color: var(--primary-color);
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .quick-action-btn {
+            padding: 8px 15px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .quick-action-btn:hover {
+            background: var(--secondary-color);
+            color: white;
+            border-color: var(--secondary-color);
+        }
+
+        .grades-table-container {
+            overflow-x: auto;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .grades-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+
+        .grades-table th {
+            background: #f8f9fa;
+            padding: 15px;
+            text-align: center;
+            font-weight: 600;
+            color: var(--primary-color);
+            border-bottom: 2px solid #e0e0e0;
+            position: sticky;
+            top: 0;
+        }
+
+        .grades-table td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+
+        .grades-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .grade-input-small {
+            width: 70px;
+            padding: 8px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .grade-input-small:focus {
+            border-color: var(--secondary-color);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .monthly-grades {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .month-grade {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .month-grade label {
+            min-width: 80px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        /* الجداول */
+        .table-container {
+            background-color: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: right;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        /* النماذج */
+        .form-container {
+            background-color: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            max-width: 800px;
+            margin: 20px auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--secondary-color);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--secondary-color) 0%, #2980b9 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2980b9 0%, var(--secondary-color) 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--accent-color) 0%, #27ae60 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #27ae60 0%, var(--accent-color) 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(46, 204, 113, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger-color) 0%, #c0392b 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #c0392b 0%, var(--danger-color) 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
+        }
+
+        .buttons-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: flex-end;
+        }
+
+        /* المخططات البيانية */
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .chart-box {
+            background-color: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .chart-title {
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        /* إشعارات */
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            z-index: 10000;
+            animation: slideIn 0.3s, fadeOut 0.5s 3s forwards;
+            max-width: 350px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .notification.success {
+            background: linear-gradient(135deg, var(--accent-color) 0%, #27ae60 100%);
+        }
+
+        .notification.error {
+            background: linear-gradient(135deg, var(--danger-color) 0%, #c0392b 100%);
+        }
+
+        .notification.info {
+            background: linear-gradient(135deg, var(--secondary-color) 0%, #2980b9 100%);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            to { opacity: 0; }
+        }
+
+        /* التصميم المتجاوب */
+        @media (max-width: 768px) {
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+
+            .cards-container {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 0 20px;
+                height: 70px;
+            }
+
+            .menu-toggle {
+                top: 15px;
+                right: 15px;
+                width: 45px;
+                height: 45px;
+                font-size: 1.3rem;
+            }
+
+            .dropdown-menu {
+                top: 70px;
+                right: 15px;
+                width: 220px;
+            }
+
+            .grades-table th,
+            .grades-table td {
+                padding: 10px;
+                font-size: 0.9rem;
+            }
+
+            .grade-input-small {
+                width: 60px;
+                padding: 6px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .cards-container {
+                grid-template-columns: 1fr;
+            }
+
+            .content {
+                padding: 15px;
+            }
+
+            .header-title h1 {
+                font-size: 1.3rem;
+            }
+
+            .grade-tab {
+                padding: 10px 15px;
+                font-size: 0.9rem;
+            }
+        }
+
+        /* عناصر خاصة */
+        .export-options {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .file-input-container {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .file-input-container input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 12px 20px;
+            background-color: #f8f9fa;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .file-input-label:hover {
+            border-color: var(--secondary-color);
+            background-color: rgba(52, 152, 219, 0.05);
+        }
+
+        .search-container {
+            margin-bottom: 20px;
+        }
+
+        .search-box {
+            max-width: 400px;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .search-box:focus {
+            border-color: var(--secondary-color);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .student-photo {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #777;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .student-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #7f8c8d;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: #ddd;
+        }
+
+        .welcome-section {
+            margin-top: 40px;
+        }
+
+        .welcome-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 15px;
+            padding: 30px;
+            border-left: 5px solid var(--secondary-color);
+        }
+
+        .welcome-card h3 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .welcome-card ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .welcome-card li {
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .welcome-card li:before {
+            content: "✓";
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        .info-box {
+            background-color: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-box i {
+            color: var(--secondary-color);
+            font-size: 1.2rem;
+        }
+
+        /* الـ Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: 15px;
+            max-width: 600px;
+            margin: 20px;
+            max-height: 90vh;
+            overflow-y: auto;
+            width: 90%;
+        }
+    </style>
+</head>
+<body>
+    <!-- زر القائمة المنسدلة -->
+    <button class="menu-toggle" id="menuToggle">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- القائمة المنسدلة -->
+    <div class="dropdown-menu" id="dropdownMenu">
+        <div class="menu-header">
+            <h3>نظام إدارة الدرجات</h3>
+            <p>الإصدار 1.0.0</p>
+        </div>
+        <div class="menu-items">
+            <a href="#" class="dropdown-item active" data-page="dashboard">
+                <i class="fas fa-tachometer-alt"></i>
+                <span class="dropdown-item-text">لوحة التحكم</span>
+            </a>
+            <a href="#" class="dropdown-item" data-page="students">
+                <i class="fas fa-users"></i>
+                <span class="dropdown-item-text">إدارة الطلاب</span>
+            </a>
+            <a href="#" class="dropdown-item" data-page="grades">
+                <i class="fas fa-edit"></i>
+                <span class="dropdown-item-text">إدخال الدرجات</span>
+            </a>
+            <a href="#" class="dropdown-item" data-page="results">
+                <i class="fas fa-chart-bar"></i>
+                <span class="dropdown-item-text">عرض النتائج</span>
+            </a>
+            <a href="#" class="dropdown-item" data-page="reports">
+                <i class="fas fa-file-alt"></i>
+                <span class="dropdown-item-text">التقارير</span>
+            </a>
+            <a href="#" class="dropdown-item" data-page="account">
+                <i class="fas fa-user-circle"></i>
+                <span class="dropdown-item-text">حسابي</span>
+            </a>
+            <a href="#" class="dropdown-item" data-page="settings">
+                <i class="fas fa-cog"></i>
+                <span class="dropdown-item-text">الإعدادات</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- الرأس -->
+    <div class="header">
+        <div class="header-title">
+            <h1 id="pageTitle">لوحة التحكم</h1>
+        </div>
+        <div class="user-profile">
+            <div class="user-avatar" id="userAvatar">م</div>
+            <div class="user-info">
+                <div class="user-name" id="userName">المعلم أحمد</div>
+                <div class="user-role">مدرس</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- المحتوى الرئيسي -->
+    <div class="content">
+        <!-- رقائق التنقل -->
+        <div class="breadcrumb" id="breadcrumb">
+            <!-- سيتم ملؤها ديناميكياً -->
+        </div>
+
+        <!-- لوحة التحكم -->
+        <div class="page active" id="dashboard">
+            <h2>مرحباً بك في نظام إدارة الدرجات</h2>
+            <p class="subtitle">نظام متكامل لإدارة درجات الطلاب وتقييم أدائهم</p>
+
+            <div class="cards-container">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">إجمالي الطلاب</div>
+                        <div class="card-icon icon-students">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                    <div class="card-value" id="totalStudents">0</div>
+                    <div class="card-subtitle">طالب مسجل</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">نسبة النجاح</div>
+                        <div class="card-icon icon-pass">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+                    <div class="card-value" id="passRate">0%</div>
+                    <div class="card-subtitle">من إجمالي الطلاب</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">الراسبين</div>
+                        <div class="card-icon icon-fail">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                    </div>
+                    <div class="card-value" id="failCount">0</div>
+                    <div class="card-subtitle">يحتاجون متابعة</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">الشعب</div>
+                        <div class="card-icon icon-classes">
+                            <i class="fas fa-school"></i>
+                        </div>
+                    </div>
+                    <div class="card-value" id="classesCount">0</div>
+                    <div class="card-subtitle">شعبة دراسية</div>
+                </div>
+            </div>
+
+            <div class="welcome-section">
+                <div class="welcome-card">
+                    <h3><i class="fas fa-info-circle"></i> كيف تبدأ؟</h3>
+                    <ul>
+                        <li>ابدأ بإضافة الطلاب من قسم "إدارة الطلاب"</li>
+                        <li>أدخل درجات الطلاب من قسم "إدخال الدرجات"</li>
+                        <li>تابع النتائج والتقارير من الأقسام المخصصة</li>
+                        <li>قم بتخصيص الإعدادات حسب احتياجاتك</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- إدارة الطلاب -->
+        <div class="page" id="students">
+            <h2>إدارة الطلاب</h2>
+            <p class="subtitle">إضافة وتعديل وحذف بيانات الطلاب</p>
+
+            <div class="info-box">
+                <i class="fas fa-info-circle"></i>
+                <p>يمكنك إضافة الطلاب يدوياً أو استيرادهم من ملف Excel</p>
+            </div>
+
+            <div class="buttons-container">
+                <button class="btn btn-primary" id="addStudentBtn">
+                    <i class="fas fa-plus"></i> إضافة طالب جديد
+                </button>
+            </div>
+
+            <!-- خيارات الاستيراد -->
+            <div class="form-row" style="margin-top: 15px; margin-bottom: 15px;">
+                <div class="form-group">
+                    <label for="importClass">الصف للاستيراد</label>
+                    <select id="importClass" class="form-control">
+                        <option value="الأول">الأول</option>
+                        <option value="الثاني">الثاني</option>
+                        <option value="الثالث">الثالث</option>
+                        <option value="الرابع">الرابع</option>
+                        <option value="الخامس">الخامس</option>
+                        <option value="السادس">السادس</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="importSection">الشعبة للاستيراد</label>
+                    <select id="importSection" class="form-control">
+                        <option value="أ">أ</option>
+                        <option value="ب">ب</option>
+                        <option value="ج">ج</option>
+                        <option value="د">د</option>
+                        <option value="هـ">هـ</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="buttons-container">
+                <div class="file-input-container">
+                    <input type="file" id="excelImport" accept=".xlsx, .xls, .csv">
+                    <label class="file-input-label btn btn-success" for="excelImport">
+                        <i class="fas fa-file-excel"></i> استيراد من Excel
+                    </label>
+                </div>
+                <button class="btn btn-warning" id="exportStudentsExcel">
+                    <i class="fas fa-download"></i> تصدير إلى Excel
+                </button>
+            </div>
+
+            <div class="search-container">
+                <input type="text" class="search-box" id="studentSearch" placeholder="بحث بالاسم أو الشعبة...">
+            </div>
+
+            <div class="table-container">
+                <div class="table-responsive">
+                    <table id="studentsTable">
+                        <thead>
+                            <tr>
+                                <th>الصورة</th>
+                                <th>الاسم</th>
+                                <th>الصف</th>
+                                <th>الشعبة</th>
+                                <th>الهاتف</th>
+                                <th>الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentsTableBody">
+                            <!-- سيتم ملؤها ديناميكياً -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state" id="emptyStudentsState">
+                    <i class="fas fa-user-graduate"></i>
+                    <h3>لا يوجد طلاب مسجلين</h3>
+                    <p>ابدأ بإضافة طلاب جدد أو استيرادهم من ملف Excel</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- إدخال الدرجات -->
+        <div class="page" id="grades">
+            <h2>إدخال الدرجات</h2>
+            <p class="subtitle">إدخال درجات الطلاب للفصول الأربعة</p>
+
+            <div class="info-box">
+                <i class="fas fa-info-circle"></i>
+                <p>يتم الحساب التلقائي للمعدلات بناءً على الإعدادات المحددة</p>
+            </div>
+
+            <!-- تباديل الدرجات -->
+            <div class="grades-tabs" id="gradesTabs">
+                <!-- سيتم ملؤها ديناميكياً -->
+            </div>
+
+            <!-- محتويات التباديل -->
+            <div id="gradesContent">
+                <!-- سيتم ملؤها ديناميكياً -->
+            </div>
+        </div>
+
+        <!-- عرض النتائج -->
+        <div class="page" id="results">
+            <h2>عرض النتائج</h2>
+            <p class="subtitle">عرض النتائج حسب الاختبارات</p>
+
+            <div class="search-container">
+                <input type="text" class="search-box" id="resultsSearch" placeholder="بحث عن طالب...">
+            </div>
+
+            <!-- تباديل النتائج -->
+            <div class="grades-tabs" id="resultsTabs">
+                <!-- سيتم ملؤها ديناميكياً -->
+            </div>
+
+            <!-- محتويات التباديل -->
+            <div id="resultsContent">
+                <!-- سيتم ملؤها ديناميكياً -->
+            </div>
+
+            <div class="export-options">
+                <button class="btn btn-success" id="exportExcel">
+                    <i class="fas fa-file-excel"></i> تصدير الكل إلى Excel
+                </button>
+                <button class="btn btn-danger" id="exportPDF">
+                    <i class="fas fa-file-pdf"></i> تصدير إلى PDF
+                </button>
+                <button class="btn btn-primary" id="printResults">
+                    <i class="fas fa-print"></i> طباعة النتائج
+                </button>
+            </div>
+        </div>
+
+        <!-- التقارير -->
+        <div class="page" id="reports">
+            <h2>التقارير والإحصائيات</h2>
+            <p class="subtitle">تقارير مفصلة وإحصائيات عن أداء الطلاب</p>
+
+            <div class="cards-container">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">أعلى معدل</div>
+                        <div class="card-icon icon-students">
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                    <div class="card-value" id="topGrade">-</div>
+                    <div class="card-subtitle" id="topStudent">لا توجد بيانات</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">أدنى معدل</div>
+                        <div class="card-icon icon-fail">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                    </div>
+                    <div class="card-value" id="lowestGrade">-</div>
+                    <div class="card-subtitle" id="lowestStudent">لا توجد بيانات</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">المعدل العام</div>
+                        <div class="card-icon icon-classes">
+                            <i class="fas fa-calculator"></i>
+                        </div>
+                    </div>
+                    <div class="card-value" id="averageGrade">0</div>
+                    <div class="card-subtitle">لجميع الطلاب</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">نسبة الحضور</div>
+                        <div class="card-icon icon-pass">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                    </div>
+                    <div class="card-value" id="attendanceRate">0%</div>
+                    <div class="card-subtitle">للفصل الحالي</div>
+                </div>
+            </div>
+
+            <div class="chart-box">
+                <h3 class="chart-title">تطور الأداء خلال العام</h3>
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+
+        <!-- حسابي -->
+        <div class="page" id="account">
+            <h2>حسابي</h2>
+            <p class="subtitle">إدارة معلومات حساب المعلم</p>
+
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="teacherName">اسم المعلم</label>
+                    <input type="text" id="teacherName" placeholder="أدخل اسم المعلم">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="teacherEmail">البريد الإلكتروني</label>
+                        <input type="email" id="teacherEmail" placeholder="example@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="teacherPhone">رقم الهاتف</label>
+                        <input type="tel" id="teacherPhone" placeholder="05XXXXXXXX">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="teacherSchool">المدرسة</label>
+                    <input type="text" id="teacherSchool" placeholder="اسم المدرسة">
+                </div>
+
+                <div class="form-group">
+                    <label for="teacherSubjects">المواد الدراسية</label>
+                    <input type="text" id="teacherSubjects" placeholder="المواد التي تدرسها (مفصولة بفاصلة)">
+                </div>
+
+                <div class="buttons-container">
+                    <button class="btn btn-primary" id="saveTeacherInfo">حفظ المعلومات</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- الإعدادات -->
+        <div class="page" id="settings">
+            <h2>الإعدادات</h2>
+            <p class="subtitle">تخصيص إعدادات النظام</p>
+
+            <div class="form-container">
+                <h3>إعدادات الدرجات</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="passingGrade">درجة النجاح</label>
+                        <input type="number" id="passingGrade" min="0" max="100" value="50">
+                    </div>
+                    <div class="form-group">
+                        <label for="maxGrade">الدرجة العظمى النهائية</label>
+                        <input type="number" id="maxGrade" min="0" value="100">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="course1Weight">وزن الكورس الأول (%)</label>
+                        <input type="number" id="course1Weight" min="0" max="100" value="20">
+                    </div>
+                    <div class="form-group">
+                        <label for="midtermWeight">وزن نصف السنة (%)</label>
+                        <input type="number" id="midtermWeight" min="0" max="100" value="25">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="course2Weight">وزن الكورس الثاني (%)</label>
+                        <input type="number" id="course2Weight" min="0" max="100" value="20">
+                    </div>
+                    <div class="form-group">
+                        <label for="finalWeight">وزن النهائية (%)</label>
+                        <input type="number" id="finalWeight" min="0" max="100" value="35">
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 30px;">إعدادات الدرجات القصوى</h3>
+                <div class="info-box">
+                    <i class="fas fa-info-circle"></i>
+                    <p>يمكنك تغيير الدرجة العظمى لكل اختبار. القيمة الافتراضية 100.</p>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="course1Max">الدرجة العظمى للكورس الأول (للشهر والسعي)</label>
+                        <input type="number" id="course1Max" min="0" value="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="midtermMax">الدرجة العظمى لنصف السنة</label>
+                        <input type="number" id="midtermMax" min="0" value="100">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="course2Max">الدرجة العظمى للكورس الثاني (للشهر والسعي)</label>
+                        <input type="number" id="course2Max" min="0" value="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="finalMax">الدرجة العظمى للنهائية (للسعي السنوي والامتحان)</label>
+                        <input type="number" id="finalMax" min="0" value="100">
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 30px;">إعدادات النظام</h3>
+                <div class="form-group">
+                    <label for="schoolName">اسم المدرسة</label>
+                    <input type="text" id="schoolName" placeholder="اسم المدرسة">
+                </div>
+
+                <div class="form-group">
+                    <label for="academicYear">العام الدراسي</label>
+                    <input type="text" id="academicYear" placeholder="مثال: 2023-2024">
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="autoCalculate"> الحساب التلقائي للمعدلات
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="showGrades"> عرض الدرجات للطلاب
+                    </label>
+                </div>
+
+                <div class="buttons-container">
+                    <button class="btn btn-success" id="saveSettings">حفظ الإعدادات</button>
+                    <button class="btn btn-danger" id="resetData">مسح جميع البيانات</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- نموذج إضافة/تعديل طالب -->
+    <div class="modal-overlay" id="studentModal">
+        <div class="modal-content">
+            <div class="form-container">
+                <h2 id="modalTitle">إضافة طالب جديد</h2>
+                <div class="form-group">
+                    <label for="studentName">اسم الطالب</label>
+                    <input type="text" id="studentName" placeholder="أدخل الاسم الكامل للطالب">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="studentClass">الصف</label>
+                        <select id="studentClass">
+                            <option value="الأول">الأول</option>
+                            <option value="الثاني">الثاني</option>
+                            <option value="الثالث">الثالث</option>
+                            <option value="الرابع">الرابع</option>
+                            <option value="الخامس">الخامس</option>
+                            <option value="السادس">السادس</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="studentSection">الشعبة</label>
+                        <select id="studentSection">
+                            <option value="أ">أ</option>
+                            <option value="ب">ب</option>
+                            <option value="ج">ج</option>
+                            <option value="د">د</option>
+                            <option value="هـ">هـ</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="studentPhone">رقم الهاتف</label>
+                    <input type="tel" id="studentPhone" placeholder="رقم هاتف ولي الأمر">
+                </div>
+                <div class="form-group">
+                    <label for="studentNotes">ملاحظات</label>
+                    <textarea id="studentNotes" rows="3" placeholder="ملاحظات إضافية"></textarea>
+                </div>
+                <div class="buttons-container">
+                    <button class="btn btn-primary" id="saveStudent">حفظ</button>
+                    <button class="btn btn-danger" id="cancelModal">إلغاء</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- إشعارات -->
+    <div class="notification" id="notification" style="display: none;"></div>
+
+    <script>
+        // البيانات المخزنة محلياً
+        let students = JSON.parse(localStorage.getItem('students')) || [];
+        let settings = JSON.parse(localStorage.getItem('settings')) || {
+            passingGrade: 50,
+            maxGrade: 100,
+            course1Weight: 20,
+            midtermWeight: 25,
+            course2Weight: 20,
+            finalWeight: 35,
+            course1Max: 100,
+            course2Max: 100,
+            midtermMax: 100,
+            finalMax: 100,
+            schoolName: 'مدرسة النموذج',
+            academicYear: '2023-2024',
+            autoCalculate: true,
+            showGrades: true
+        };
+        let teacherInfo = JSON.parse(localStorage.getItem('teacherInfo')) || {
+            name: 'المعلم أحمد',
+            email: 'teacher@school.com',
+            phone: '0512345678',
+            school: 'مدرسة النموذج',
+            subjects: 'الرياضيات, العلوم, اللغة العربية'
+        };
+
+        // العناصر الرئيسية
+        const menuToggle = document.getElementById('menuToggle');
+        const dropdownMenu = document.getElementById('dropdownMenu');
+        const dropdownItems = document.querySelectorAll('.dropdown-item');
+        const pages = document.querySelectorAll('.page');
+        const pageTitle = document.getElementById('pageTitle');
+        const breadcrumb = document.getElementById('breadcrumb');
+
+        // تهيئة التطبيق عند تحميل الصفحة
+        document.addEventListener('DOMContentLoaded', function() {
+            initApp();
+        });
+
+        function initApp() {
+            // إنشاء بيانات تجريبية إذا لم يكن هناك بيانات
+            if (students.length === 0) {
+                createSampleData();
+            }
+            
+            // تهيئة القائمة المنسدلة
+            initDropdownMenu();
+            
+            // تهيئة بيانات العرض
+            updateDashboard();
+            renderStudentsTable();
+            initGradesPage();
+            loadTeacherInfo();
+            loadSettings();
+            updateBreadcrumb('dashboard');
+            
+            // إضافة المستمعين للأحداث
+            setupEventListeners();
+            
+            // إغلاق القائمة عند النقر خارجها
+            document.addEventListener('click', function(event) {
+                if (!dropdownMenu.contains(event.target) && !menuToggle.contains(event.target)) {
+                    dropdownMenu.classList.remove('active');
+                }
+            });
+            
+            // إغلاق الـ modal عند النقر خارج المحتوى
+            document.getElementById('studentModal').addEventListener('click', function(e) {
+                if (e.target.id === 'studentModal') {
+                    this.style.display = 'none';
+                }
+            });
+            
+            // تهيئة الرسم البياني
+            initPerformanceChart();
+        }
+
+        function createSampleData() {
+            const sampleStudents = [
+                {
+                    id: 1,
+                    name: 'محمد أحمد',
+                    class: 'الثاني',
+                    section: 'أ',
+                    phone: '0511111111',
+                    notes: '',
+                    grades: {
+                        course1: { month1: 80, month2: 85, effort: 83 },
+                        midterm: { exam: 88 },
+                        course2: { month1: 90, month2: 92, effort: 91 },
+                        final: { yearlyEffort: 87, exam: 92 }
+                    },
+                    attendance: []
+                },
+                {
+                    id: 2,
+                    name: 'سارة خالد',
+                    class: 'الثاني',
+                    section: 'ب',
+                    phone: '0522222222',
+                    notes: '',
+                    grades: {
+                        course1: { month1: 95, month2: 98, effort: 97 },
+                        midterm: { exam: 96 },
+                        course2: { month1: 97, month2: 99, effort: 98 },
+                        final: { yearlyEffort: 97, exam: 98 }
+                    },
+                    attendance: []
+                },
+                {
+                    id: 3,
+                    name: 'علي محمد',
+                    class: 'الثالث',
+                    section: 'أ',
+                    phone: '0533333333',
+                    notes: '',
+                    grades: {
+                        course1: { month1: 60, month2: 65, effort: 63 },
+                        midterm: { exam: 70 },
+                        course2: { month1: 68, month2: 72, effort: 70 },
+                        final: { yearlyEffort: 68, exam: 75 }
+                    },
+                    attendance: []
+                },
+                {
+                    id: 4,
+                    name: 'فاطمة عبدالله',
+                    class: 'الثالث',
+                    section: 'ج',
+                    phone: '0544444444',
+                    notes: '',
+                    grades: {
+                        course1: { month1: 45, month2: 50, effort: 48 },
+                        midterm: { exam: 55 },
+                        course2: { month1: 52, month2: 58, effort: 55 },
+                        final: { yearlyEffort: 53, exam: 60 }
+                    },
+                    attendance: []
+                }
+            ];
+            students = sampleStudents;
+            localStorage.setItem('students', JSON.stringify(students));
+        }
+
+        function initDropdownMenu() {
+            // تبديل القائمة المنسدلة
+            menuToggle.addEventListener('click', function(event) {
+                event.stopPropagation();
+                dropdownMenu.classList.toggle('active');
+            });
+            
+            // تغيير الصفحات عند النقر على عنصر القائمة
+            dropdownItems.forEach(item => {
+                item.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    const pageId = this.getAttribute('data-page');
+                    
+                    // تحديث القائمة النشطة
+                    dropdownItems.forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // إغلاق القائمة المنسدلة
+                    dropdownMenu.classList.remove('active');
+                    
+                    // عرض الصفحة المحددة
+                    switchPage(pageId);
+                });
+            });
+        }
+
+        function switchPage(pageId) {
+            // تحديث عنوان الصفحة
+            const pageNames = {
+                'dashboard': 'لوحة التحكم',
+                'students': 'إدارة الطلاب',
+                'grades': 'إدخال الدرجات',
+                'results': 'عرض النتائج',
+                'reports': 'التقارير',
+                'account': 'حسابي',
+                'settings': 'الإعدادات'
+            };
+            pageTitle.textContent = pageNames[pageId];
+            
+            // تحديث رقائق التنقل
+            updateBreadcrumb(pageId);
+            
+            // إخفاء جميع الصفحات وإظهار الصفحة المحددة
+            pages.forEach(page => {
+                page.classList.remove('active');
+                if (page.id === pageId) {
+                    page.classList.add('active');
+                    
+                    // تحديث البيانات عند عرض الصفحة
+                    if (pageId === 'dashboard') {
+                        updateDashboard();
+                    } else if (pageId === 'students') {
+                        renderStudentsTable();
+                    } else if (pageId === 'grades') {
+                        initGradesPage();
+                    } else if (pageId === 'results') {
+                        initResultsPage();
+                    } else if (pageId === 'reports') {
+                        updateReports();
+                    }
+                }
+            });
+        }
+
+        function updateBreadcrumb(pageId) {
+            const pageNames = {
+                'dashboard': { name: 'لوحة التحكم', icon: 'tachometer-alt' },
+                'students': { name: 'إدارة الطلاب', icon: 'users' },
+                'grades': { name: 'إدخال الدرجات', icon: 'edit' },
+                'results': { name: 'عرض النتائج', icon: 'chart-bar' },
+                'reports': { name: 'التقارير', icon: 'file-alt' },
+                'account': { name: 'حسابي', icon: 'user-circle' },
+                'settings': { name: 'الإعدادات', icon: 'cog' }
+            };
+
+            let html = `
+                <a href="#" class="breadcrumb-item" data-page="dashboard">
+                    <i class="fas fa-home"></i>
+                    <span>الرئيسية</span>
+                </a>
+            `;
+
+            html += `
+                <a href="#" class="breadcrumb-item ${pageId === 'dashboard' ? 'active' : ''}" data-page="${pageId}">
+                    <i class="fas fa-${pageNames[pageId].icon}"></i>
+                    <span>${pageNames[pageId].name}</span>
+                </a>
+            `;
+
+            breadcrumb.innerHTML = html;
+
+            // إضافة مستمعي الأحداث لرقائق التنقل
+            breadcrumb.querySelectorAll('.breadcrumb-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetPage = this.getAttribute('data-page');
+                    switchPage(targetPage);
+                });
+            });
+        }
+
+        function setupEventListeners() {
+            // زر إضافة طالب جديد
+            document.getElementById('addStudentBtn').addEventListener('click', function() {
+                openStudentModal();
+            });
+
+            // إغلاق النموذج
+            document.getElementById('cancelModal').addEventListener('click', function() {
+                document.getElementById('studentModal').style.display = 'none';
+            });
+
+            // حفظ بيانات الطالب
+            document.getElementById('saveStudent').addEventListener('click', function() {
+                saveStudent();
+            });
+
+            // استيراد من Excel
+            document.getElementById('excelImport').addEventListener('change', function(event) {
+                importFromExcel(event);
+            });
+
+            // تصدير الطلاب إلى Excel
+            document.getElementById('exportStudentsExcel').addEventListener('click', function() {
+                exportStudentsToExcel();
+            });
+
+            // بحث الطلاب
+            document.getElementById('studentSearch').addEventListener('input', function() {
+                searchStudents(this.value);
+            });
+
+            // حفظ إعدادات المعلم
+            document.getElementById('saveTeacherInfo').addEventListener('click', function() {
+                saveTeacherInfo();
+            });
+
+            // حفظ الإعدادات
+            document.getElementById('saveSettings').addEventListener('click', function() {
+                saveSettings();
+            });
+
+            // تصدير النتائج إلى Excel
+            document.getElementById('exportExcel').addEventListener('click', function() {
+                exportResultsToExcel();
+            });
+
+            // تصدير إلى PDF
+            document.getElementById('exportPDF').addEventListener('click', function() {
+                exportToPDF();
+            });
+
+            // زر الطباعة
+            document.getElementById('printResults').addEventListener('click', function() {
+                printResults();
+            });
+
+            // إعادة تعيين البيانات
+            document.getElementById('resetData').addEventListener('click', function() {
+                resetAllData();
+            });
+
+            // زر Enter في نموذج الطالب
+            document.getElementById('studentName').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('saveStudent').click();
+                }
+            });
+        }
+
+        // === دوال إدارة الطلاب ===
+        function openStudentModal(studentIndex = null) {
+            const modal = document.getElementById('studentModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const studentName = document.getElementById('studentName');
+            const studentClass = document.getElementById('studentClass');
+            const studentSection = document.getElementById('studentSection');
+            const studentPhone = document.getElementById('studentPhone');
+            const studentNotes = document.getElementById('studentNotes');
+
+            if (studentIndex !== null && students[studentIndex]) {
+                // وضع التعديل
+                modalTitle.textContent = 'تعديل بيانات الطالب';
+                const student = students[studentIndex];
+                studentName.value = student.name || '';
+                studentClass.value = student.class || 'الأول';
+                studentSection.value = student.section || 'أ';
+                studentPhone.value = student.phone || '';
+                studentNotes.value = student.notes || '';
+                modal.dataset.editIndex = studentIndex;
+            } else {
+                // وضع الإضافة
+                modalTitle.textContent = 'إضافة طالب جديد';
+                studentName.value = '';
+                studentClass.value = 'الأول';
+                studentSection.value = 'أ';
+                studentPhone.value = '';
+                studentNotes.value = '';
+                delete modal.dataset.editIndex;
+            }
+
+            modal.style.display = 'flex';
+            studentName.focus();
+        }
+
+        function saveStudent() {
+            const modal = document.getElementById('studentModal');
+            const studentName = document.getElementById('studentName').value.trim();
+            const studentClass = document.getElementById('studentClass').value;
+            const studentSection = document.getElementById('studentSection').value;
+            const studentPhone = document.getElementById('studentPhone').value.trim();
+            const studentNotes = document.getElementById('studentNotes').value.trim();
+
+            if (!studentName) {
+                showNotification('يرجى إدخال اسم الطالب', 'error');
+                return;
+            }
+
+            const editIndex = modal.dataset.editIndex;
+
+            if (editIndex !== undefined) {
+                // تعديل طالب موجود
+                students[editIndex] = {
+                    ...students[editIndex],
+                    name: studentName,
+                    class: studentClass,
+                    section: studentSection,
+                    phone: studentPhone,
+                    notes: studentNotes
+                };
+            } else {
+                // إضافة طالب جديد
+                const newStudent = {
+                    id: Date.now(),
+                    name: studentName,
+                    class: studentClass,
+                    section: studentSection,
+                    phone: studentPhone,
+                    notes: studentNotes,
+                    grades: {},
+                    attendance: []
+                };
+                students.push(newStudent);
+            }
+
+            localStorage.setItem('students', JSON.stringify(students));
+            modal.style.display = 'none';
+            renderStudentsTable();
+            updateDashboard();
+            initGradesPage();
+            initResultsPage();
+            
+            const message = editIndex !== undefined ? 'تم تحديث بيانات الطالب' : 'تم إضافة الطالب بنجاح';
+            showNotification(message, 'success');
+        }
+
+        function importFromExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // الحصول على الصف والشعبة المحددين
+            const selectedClass = document.getElementById('importClass').value || 'الأول';
+            const selectedSection = document.getElementById('importSection').value || 'أ';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = e.target.result;
+                    const workbook = XLSX.read(data, { type: 'binary' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                    
+                    let importedCount = 0;
+                    
+                    // تخطي الصف الأول (العناوين)
+                    for (let i = 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (row.length > 0 && row[0]) {
+                            const newStudent = {
+                                id: Date.now() + i,
+                                name: String(row[0]).trim(),
+                                class: selectedClass, // استخدام الصف المحدد
+                                section: selectedSection, // استخدام الشعبة المحددة
+                                phone: row[1] ? String(row[1]).trim() : '',
+                                notes: row[2] ? String(row[2]).trim() : '',
+                                grades: {},
+                                attendance: []
+                            };
+                            students.push(newStudent);
+                            importedCount++;
+                        }
+                    }
+
+                    if (importedCount > 0) {
+                        localStorage.setItem('students', JSON.stringify(students));
+                        renderStudentsTable();
+                        updateDashboard();
+                        initGradesPage();
+                        initResultsPage();
+                        showNotification(`تم استيراد ${importedCount} طالب بنجاح`, 'success');
+                    } else {
+                        showNotification('لم يتم استيراد أي بيانات، تأكد من وجود عمود الأسماء في الملف', 'warning');
+                    }
+                    
+                    // إعادة تعيين حقل الملف
+                    event.target.value = '';
+                } catch (error) {
+                    console.error('خطأ في الاستيراد:', error);
+                    showNotification('حدث خطأ في استيراد الملف. تأكد من تنسيق Excel الصحيح', 'error');
+                }
+            };
+
+            reader.onerror = function() {
+                showNotification('حدث خطأ في قراءة الملف', 'error');
+            };
+
+            reader.readAsBinaryString(file);
+        }
+
+        function exportStudentsToExcel() {
+            if (students.length === 0) {
+                showNotification('لا يوجد بيانات للتصدير', 'warning');
+                return;
+            }
+
+            const data = students.map(student => [
+                student.name,
+                student.class,
+                student.section,
+                student.phone || '',
+                student.notes || ''
+            ]);
+
+            const worksheet = XLSX.utils.aoa_to_sheet([
+                ['اسم الطالب', 'الصف', 'الشعبة', 'الهاتف', 'ملاحظات'],
+                ...data
+            ]);
+
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'الطلاب');
+            
+            XLSX.writeFile(workbook, `طلاب_${settings.schoolName}_${new Date().toLocaleDateString('ar-SA')}.xlsx`);
+            showNotification('تم تصدير بيانات الطلاب بنجاح', 'success');
+        }
+
+        function renderStudentsTable() {
+            const tableBody = document.getElementById('studentsTableBody');
+            const emptyState = document.getElementById('emptyStudentsState');
+
+            if (students.length === 0) {
+                tableBody.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+
+            let html = '';
+            students.forEach((student, index) => {
+                const initials = student.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'ط';
+                html += `
+                    <tr>
+                        <td>
+                            <div class="student-photo">${initials}</div>
+                        </td>
+                        <td>${student.name}</td>
+                        <td>${student.class}</td>
+                        <td>${student.section}</td>
+                        <td>${student.phone || '-'}</td>
+                        <td>
+                            <button class="btn btn-primary" onclick="editStudent(${index})" style="padding: 5px 10px; font-size: 0.8rem; margin: 2px;">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-danger" onclick="deleteStudent(${index})" style="padding: 5px 10px; font-size: 0.8rem; margin: 2px;">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableBody.innerHTML = html;
+        }
+
+        function searchStudents(query) {
+            const rows = document.querySelectorAll('#studentsTableBody tr');
+            query = query.toLowerCase();
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
+            });
+        }
+
+        // === دوال الدرجات ===
+        function initGradesPage() {
+            const gradesTabs = document.getElementById('gradesTabs');
+            const gradesContent = document.getElementById('gradesContent');
+            
+            const gradingPeriods = [
+                {id: 'course1', name: 'الكورس الأول', icon: 'calendar-alt'},
+                {id: 'midterm', name: 'نصف السنة', icon: 'file-signature'},
+                {id: 'course2', name: 'الكورس الثاني', icon: 'calendar-alt'},
+                {id: 'final', name: 'النهائية', icon: 'graduation-cap'}
+            ];
+            
+            // إنشاء التباديل
+            let tabsHtml = '';
+            let contentHtml = '';
+            
+            gradingPeriods.forEach((period, index) => {
+                // تبويب
+                tabsHtml += `
+                    <div class="grade-tab ${index === 0 ? 'active' : ''}" data-tab="${period.id}">
+                        <i class="fas fa-${period.icon}"></i>
+                        ${period.name}
+                    </div>
+                `;
+                
+                // محتوى التبويب
+                contentHtml += `
+                    <div class="grade-content ${index === 0 ? 'active' : ''}" id="${period.id}-content">
+                        <div class="quick-grades">
+                            <div class="quick-grades-header">
+                                <h3>${period.name}</h3>
+                                <div class="quick-actions">
+                                    ${period.id === 'course1' || period.id === 'course2' ? 
+                                    `<button class="quick-action-btn" onclick="calculateEffort('${period.id}')">
+                                        <i class="fas fa-calculator"></i> حساب السعي تلقائياً
+                                    </button>` : ''}
+                                    <button class="quick-action-btn" onclick="fillAllGrades('${period.id}', 80)">
+                                        <i class="fas fa-bolt"></i> تعبئة 80
+                                    </button>
+                                    <button class="quick-action-btn" onclick="fillAllGrades('${period.id}', 90)">
+                                        <i class="fas fa-star"></i> تعبئة 90
+                                    </button>
+                                    <button class="quick-action-btn" onclick="saveAllGrades('${period.id}')">
+                                        <i class="fas fa-save"></i> حفظ الكل
+                                    </button>
+                                </div>
+                            </div>
+                            ${students.length > 0 ? generateGradesTable(period) : `
+                            <div class="empty-state">
+                                <i class="fas fa-clipboard-list"></i>
+                                <p>لا يوجد طلاب لإدخال الدرجات</p>
+                                <p>يرجى إضافة طلاب أولاً</p>
+                            </div>
+                            `}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            gradesTabs.innerHTML = tabsHtml;
+            gradesContent.innerHTML = contentHtml;
+            
+            // إضافة مستمعي الأحداث للتباديل
+            document.querySelectorAll('.grade-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // تحديث التبويب النشط
+                    document.querySelectorAll('.grade-tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // تحديث المحتوى النشط
+                    document.querySelectorAll('.grade-content').forEach(c => c.classList.remove('active'));
+                    document.getElementById(`${tabId}-content`).classList.add('active');
+                });
+            });
+        }
+
+        function generateGradesTable(period) {
+            const maxScores = {
+                'course1': { 
+                    month1: settings.course1Max || 100, 
+                    month2: settings.course1Max || 100, 
+                    effort: settings.course1Max || 100 
+                },
+                'midterm': { 
+                    exam: settings.midtermMax || 100 
+                },
+                'course2': { 
+                    month1: settings.course2Max || 100, 
+                    month2: settings.course2Max || 100, 
+                    effort: settings.course2Max || 100 
+                },
+                'final': { 
+                    yearlyEffort: settings.finalMax || 100, 
+                    exam: settings.finalMax || 100 
+                }
+            };
+            
+            let html = `
+                <div class="grades-table-container">
+                    <table class="grades-table">
+                        <thead>
+                            <tr>
+                                <th>اسم الطالب</th>
+                                <th>الصف</th>
+                                <th>الشعبة</th>
+            `;
+            
+            // إضافة أعمدة للدرجات حسب الفترة
+            if (period.id === 'course1' || period.id === 'course2') {
+                html += `
+                    <th>الشهر الأول (من ${maxScores[period.id].month1})</th>
+                    <th>الشهر الثاني (من ${maxScores[period.id].month2})</th>
+                    <th>السعي (من ${maxScores[period.id].effort})</th>
+                    <th>المجموع</th>
+                `;
+            } else if (period.id === 'midterm') {
+                html += `
+                    <th>الامتحان (من ${maxScores[period.id].exam})</th>
+                    <th>المجموع</th>
+                `;
+            } else if (period.id === 'final') {
+                html += `
+                    <th>السعي السنوي (من ${maxScores[period.id].yearlyEffort})</th>
+                    <th>الامتحان النهائي (من ${maxScores[period.id].exam})</th>
+                    <th>المجموع</th>
+                `;
+            }
+            
+            html += `
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+            
+            students.forEach((student, index) => {
+                const grades = student.grades || {};
+                const periodGrades = grades[period.id] || {};
+                
+                html += `
+                    <tr>
+                        <td>${student.name}</td>
+                        <td>${student.class}</td>
+                        <td>${student.section}</td>
+                `;
+                
+                // حقول الإدخال حسب الفترة
+                if (period.id === 'course1' || period.id === 'course2') {
+                    const month1 = periodGrades.month1 || 0;
+                    const month2 = periodGrades.month2 || 0;
+                    const effort = periodGrades.effort || 0;
+                    const total = month1 + month2 + effort;
+                    
+                    html += `
+                        <td>
+                            <input type="number" class="grade-input-small" 
+                                   id="${period.id}-month1-${index}"
+                                   min="0" max="${maxScores[period.id].month1}"
+                                   value="${month1}"
+                                   onchange="updateEffort('${period.id}', ${index})">
+                        </td>
+                        <td>
+                            <input type="number" class="grade-input-small" 
+                                   id="${period.id}-month2-${index}"
+                                   min="0" max="${maxScores[period.id].month2}"
+                                   value="${month2}"
+                                   onchange="updateEffort('${period.id}', ${index})">
+                        </td>
+                        <td>
+                            <input type="number" class="grade-input-small" 
+                                   id="${period.id}-effort-${index}"
+                                   min="0" max="${maxScores[period.id].effort}"
+                                   value="${effort}"
+                                   onchange="calculateTotal('${period.id}', ${index})">
+                        </td>
+                        <td id="${period.id}-total-${index}">${total}</td>
+                    `;
+                } else if (period.id === 'midterm') {
+                    const exam = periodGrades.exam || 0;
+                    
+                    html += `
+                        <td>
+                            <input type="number" class="grade-input-small" 
+                                   id="${period.id}-exam-${index}"
+                                   min="0" max="${maxScores[period.id].exam}"
+                                   value="${exam}"
+                                   onchange="calculateTotal('${period.id}', ${index})">
+                        </td>
+                        <td id="${period.id}-total-${index}">${exam}</td>
+                    `;
+                } else if (period.id === 'final') {
+                    const yearlyEffort = periodGrades.yearlyEffort || 0;
+                    const exam = periodGrades.exam || 0;
+                    const total = yearlyEffort + exam;
+                    
+                    html += `
+                        <td>
+                            <input type="number" class="grade-input-small" 
+                                   id="${period.id}-yearlyEffort-${index}"
+                                   min="0" max="${maxScores[period.id].yearlyEffort}"
+                                   value="${yearlyEffort}"
+                                   onchange="calculateTotal('${period.id}', ${index})">
+                        </td>
+                        <td>
+                            <input type="number" class="grade-input-small" 
+                                   id="${period.id}-exam-${index}"
+                                   min="0" max="${maxScores[period.id].exam}"
+                                   value="${exam}"
+                                   onchange="calculateTotal('${period.id}', ${index})">
+                        </td>
+                        <td id="${period.id}-total-${index}">${total}</td>
+                    `;
+                }
+                
+                html += `</tr>`;
+            });
+            
+            html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    return html;
+}
+
+// === دوال الحساب التلقائي للسعي ===
+window.updateEffort = function(periodId, index) {
+    // حساب السعي تلقائياً: (الشهر الأول + الشهر الثاني) ÷ 2
+    const month1 = parseInt(document.getElementById(`${periodId}-month1-${index}`).value) || 0;
+    const month2 = parseInt(document.getElementById(`${periodId}-month2-${index}`).value) || 0;
+    const effort = Math.round((month1 + month2) / 2);
+    
+    document.getElementById(`${periodId}-effort-${index}`).value = effort;
+    calculateTotal(periodId, index);
+};
+
+window.calculateEffort = function(periodId) {
+    students.forEach((student, index) => {
+        const month1 = parseInt(document.getElementById(`${periodId}-month1-${index}`).value) || 0;
+        const month2 = parseInt(document.getElementById(`${periodId}-month2-${index}`).value) || 0;
+        const effort = Math.round((month1 + month2) / 2);
+        
+        document.getElementById(`${periodId}-effort-${index}`).value = effort;
+        calculateTotal(periodId, index);
+    });
+    showNotification('تم حساب السعي تلقائياً لجميع الطلاب', 'success');
+};
+
+// === تحديث دالة calculateTotal ===
+window.calculateTotal = function(periodId, index) {
+    let total = 0;
+    
+    if (periodId === 'course1' || periodId === 'course2') {
+        const month1 = parseInt(document.getElementById(`${periodId}-month1-${index}`).value) || 0;
+        const month2 = parseInt(document.getElementById(`${periodId}-month2-${index}`).value) || 0;
+        const effort = parseInt(document.getElementById(`${periodId}-effort-${index}`).value) || 0;
+        total = month1 + month2 + effort;
+    } else if (periodId === 'midterm') {
+        total = parseInt(document.getElementById(`${periodId}-exam-${index}`).value) || 0;
+    } else if (periodId === 'final') {
+        const yearlyEffort = parseInt(document.getElementById(`${periodId}-yearlyEffort-${index}`).value) || 0;
+        const exam = parseInt(document.getElementById(`${periodId}-exam-${index}`).value) || 0;
+        total = yearlyEffort + exam;
+    }
+    
+    document.getElementById(`${periodId}-total-${index}`).textContent = total;
+};
+
+// === تحديث دالة saveAllGrades لحساب السعي السنوي ===
+window.saveAllGrades = function(periodId) {
+    if (!students || students.length === 0) {
+        showNotification('لا يوجد طلاب لحفظ الدرجات', 'warning');
+        return;
+    }
+
+    let hasChanges = false;
+    let error = false;
+    
+    students.forEach((student, index) => {
+        if (!student.grades) student.grades = {};
+        
+        try {
+            if (periodId === 'course1' || periodId === 'course2') {
+                const month1 = parseInt(document.getElementById(`${periodId}-month1-${index}`).value) || 0;
+                const month2 = parseInt(document.getElementById(`${periodId}-month2-${index}`).value) || 0;
+                const effort = parseInt(document.getElementById(`${periodId}-effort-${index}`).value) || 0;
+                
+                // التحقق من الحدود
+                const maxScore = settings[periodId + 'Max'] || 100;
+                if (month1 > maxScore || month2 > maxScore || effort > maxScore) {
+                    throw new Error('القيمة تتجاوز الحد الأقصى');
+                }
+                
+                student.grades[periodId] = { month1, month2, effort };
+                hasChanges = true;
+                
+                // إذا حفظنا درجات كورس، نفحص إذا كنا بحاجة لحساب السعي السنوي
+                if (periodId === 'course1' && student.grades.course2 && student.grades.midterm) {
+                    calculateYearlyEffort(student, index);
+                } else if (periodId === 'course2' && student.grades.course1 && student.grades.midterm) {
+                    calculateYearlyEffort(student, index);
+                }
+                
+            } else if (periodId === 'midterm') {
+                const exam = parseInt(document.getElementById(`${periodId}-exam-${index}`).value) || 0;
+                
+                if (exam > (settings.midtermMax || 100)) {
+                    throw new Error('القيمة تتجاوز الحد الأقصى');
+                }
+                
+                student.grades[periodId] = { exam };
+                hasChanges = true;
+                
+                // إذا حفظنا درجات منتصف الفصل، نفحص إذا كنا بحاجة لحساب السعي السنوي
+                if (student.grades.course1 && student.grades.course2) {
+                    calculateYearlyEffort(student, index);
+                }
+                
+            } else if (periodId === 'final') {
+                const yearlyEffort = parseInt(document.getElementById(`${periodId}-yearlyEffort-${index}`).value) || 0;
+                const exam = parseInt(document.getElementById(`${periodId}-exam-${index}`).value) || 0;
+                
+                const maxScore = settings.finalMax || 100;
+                
+                if (yearlyEffort > maxScore || exam > maxScore) {
+                    throw new Error('القيمة تتجاوز الحد الأقصى');
+                }
+                
+                student.grades[periodId] = { yearlyEffort, exam };
+                hasChanges = true;
+            }
+        } catch (e) {
+            error = true;
+            showNotification(`خطأ في درجات الطالب ${student.name}: ${e.message}`, 'error');
+        }
+    });
+    
+    if (!error && hasChanges) {
+        localStorage.setItem('students', JSON.stringify(students));
+        showNotification(`تم حفظ جميع درجات ${getPeriodName(periodId)} بنجاح`, 'success');
+        
+        if (settings.autoCalculate) {
+            initResultsPage();
+            updateDashboard();
+            updateReports();
+        }
+    } else if (!error && !hasChanges) {
+        showNotification('لم يتم إجراء أي تغييرات', 'info');
+    }
+};
+
+// === دالة حساب السعي السنوي تلقائياً ===
+function calculateYearlyEffort(student, index) {
+    // السعي السنوي = (السعي الأول + السعي الثاني + (نصف السنة ÷ 2)) ÷ 3
+    const course1 = student.grades.course1 || {};
+    const course2 = student.grades.course2 || {};
+    const midterm = student.grades.midterm || {};
+    
+    const effort1 = course1.effort || 0;
+    const effort2 = course2.effort || 0;
+    const midtermHalf = (midterm.exam || 0) / 2;
+    
+    const yearlyEffort = Math.round((effort1 + effort2 + midtermHalf) / 3);
+    
+    // تحديث حقل السعي السنوي إذا كان موجوداً في الصفحة
+    const yearlyEffortInput = document.getElementById(`final-yearlyEffort-${index}`);
+    if (yearlyEffortInput) {
+        yearlyEffortInput.value = yearlyEffort;
+        calculateTotal('final', index);
+    }
+    
+    // حفظ القيمة في بيانات الطالب
+    if (!student.grades.final) {
+        student.grades.final = {};
+    }
+    student.grades.final.yearlyEffort = yearlyEffort;
+    
+    // تحديث قاعدة البيانات
+    localStorage.setItem('students', JSON.stringify(students));
+}
+
+// === تحديث دالة fillAllGrades ===
+window.fillAllGrades = function(periodId, value) {
+    if (!students || students.length === 0) {
+        showNotification('لا يوجد طلاب لتعيين الدرجات', 'warning');
+        return;
+    }
+
+    students.forEach((student, index) => {
+        if (periodId === 'course1' || periodId === 'course2') {
+            const month1El = document.getElementById(`${periodId}-month1-${index}`);
+            const month2El = document.getElementById(`${periodId}-month2-${index}`);
+            const effortEl = document.getElementById(`${periodId}-effort-${index}`);
+            
+            if (month1El && month2El && effortEl) {
+                const maxScore = settings[periodId + 'Max'] || 100;
+                month1El.value = Math.min(value, maxScore);
+                month2El.value = Math.min(value, maxScore);
+                // حساب السعي تلقائياً
+                const effort = Math.round((value + value) / 2);
+                effortEl.value = Math.min(effort, maxScore);
+                calculateTotal(periodId, index);
+            }
+        } else if (periodId === 'midterm') {
+            const examEl = document.getElementById(`${periodId}-exam-${index}`);
+            if (examEl) {
+                examEl.value = Math.min(value, settings.midtermMax || 100);
+                calculateTotal(periodId, index);
+            }
+        } else if (periodId === 'final') {
+            const yearlyEffortEl = document.getElementById(`${periodId}-yearlyEffort-${index}`);
+            const examEl = document.getElementById(`${periodId}-exam-${index}`);
+            
+            if (yearlyEffortEl && examEl) {
+                const maxScore = settings.finalMax || 100;
+                yearlyEffortEl.value = Math.min(value, maxScore);
+                examEl.value = Math.min(value, maxScore);
+                calculateTotal(periodId, index);
+            }
+        }
+    });
+    
+    showNotification(`تم تعبئة جميع درجات ${getPeriodName(periodId)}`, 'success');
+};
+
+// === دوال النتائج ===
+function initResultsPage() {
+    const resultsTabs = document.getElementById('resultsTabs');
+    const resultsContent = document.getElementById('resultsContent');
+    
+    const resultTypes = [
+        {id: 'course1', name: 'الكورس الأول', icon: 'calendar-alt'},
+        {id: 'course2', name: 'الكورس الثاني', icon: 'calendar-alt'},
+        {id: 'final', name: 'الدرجات النهائية', icon: 'graduation-cap'}
+    ];
+    
+    // إنشاء التباديل
+    let tabsHtml = '';
+    let contentHtml = '';
+    
+    resultTypes.forEach((type, index) => {
+        // تبويب
+        tabsHtml += `
+            <div class="grade-tab ${index === 0 ? 'active' : ''}" data-tab="${type.id}">
+                <i class="fas fa-${type.icon}"></i>
+                ${type.name}
+            </div>
+        `;
+        
+        // محتوى التبويب
+        contentHtml += `
+            <div class="grade-content ${index === 0 ? 'active' : ''}" id="${type.id}-results">
+                <div class="table-container">
+                    <div class="table-responsive">
+                        <table class="grades-table">
+                            <thead id="${type.id}-thead">
+                                <!-- سيتم ملؤها ديناميكياً -->
+                            </thead>
+                            <tbody id="${type.id}-tbody">
+                                <!-- سيتم ملؤها ديناميكياً -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    resultsTabs.innerHTML = tabsHtml;
+    resultsContent.innerHTML = contentHtml;
+    
+    // إضافة مستمعي الأحداث للتباديل
+    document.querySelectorAll('#resultsTabs .grade-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const tabId = this.getAttribute('data-tab');
+            
+            // تحديث التبويب النشط
+            document.querySelectorAll('#resultsTabs .grade-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            // تحديث المحتوى النشط
+            document.querySelectorAll('#resultsContent .grade-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`${tabId}-results`).classList.add('active');
+            
+            // تحديث جدول النتائج حسب التبويب
+            updateResultsTable(tabId);
+        });
+    });
+    
+    // إضافة مستمع بحث النتائج
+    document.getElementById('resultsSearch').addEventListener('input', function() {
+        const activeTab = document.querySelector('#resultsTabs .grade-tab.active');
+        if (!activeTab) return;
+        
+        const type = activeTab.getAttribute('data-tab');
+        searchResults(type, this.value);
+    });
+    
+    // تهيئة جدول النتائج الأول
+    updateResultsTable('course1');
+}
+
+function updateResultsTable(type = 'course1') {
+    const thead = document.getElementById(`${type}-thead`);
+    const tbody = document.getElementById(`${type}-tbody`);
+    
+    if (students.length === 0) {
+        thead.innerHTML = '';
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="10" style="text-align: center; padding: 40px;">
+                    <div class="empty-state">
+                        <i class="fas fa-chart-bar"></i>
+                        <h3>لا توجد نتائج لعرضها</h3>
+                        <p>أدخل درجات الطلاب أولاً</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    let headers = '';
+    let rows = '';
+    
+    if (type === 'course1') {
+        headers = `
+            <tr>
+                <th>اسم الطالب</th>
+                <th>الصف</th>
+                <th>الشعبة</th>
+                <th>الشهر الأول</th>
+                <th>الشهر الثاني</th>
+                <th>السعي الأول</th>
+                <th>المجموع</th>
+                <th>النسبة</th>
+            </tr>
+        `;
+        
+        students.forEach(student => {
+            const grades = student.grades || {};
+            const course1 = grades.course1 || {};
+            const month1 = course1.month1 || 0;
+            const month2 = course1.month2 || 0;
+            const effort = course1.effort || 0;
+            const total = month1 + month2 + effort;
+            const max = (settings.course1Max || 100) * 3; // مجموع 3 درجات
+            const percentage = max > 0 ? Math.round((total / max) * 100) : 0;
+            
+            rows += `
+                <tr>
+                    <td>${student.name}</td>
+                    <td>${student.class}</td>
+                    <td>${student.section}</td>
+                    <td>${month1} (من ${settings.course1Max || 100})</td>
+                    <td>${month2} (من ${settings.course1Max || 100})</td>
+                    <td>${effort} (من ${settings.course1Max || 100})</td>
+                    <td style="font-weight: bold;">${total}</td>
+                    <td>${percentage}%</td>
+                </tr>
+            `;
+        });
+    }
+    else if (type === 'course2') {
+        headers = `
+            <tr>
+                <th>اسم الطالب</th>
+                <th>الصف</th>
+                <th>الشعبة</th>
+                <th>الشهر الأول</th>
+                <th>الشهر الثاني</th>
+                <th>السعي الثاني</th>
+                <th>المجموع</th>
+                <th>النسبة</th>
+            </tr>
+        `;
+        
+        students.forEach(student => {
+            const grades = student.grades || {};
+            const course2 = grades.course2 || {};
+            const month1 = course2.month1 || 0;
+            const month2 = course2.month2 || 0;
+            const effort = course2.effort || 0;
+            const total = month1 + month2 + effort;
+            const max = (settings.course2Max || 100) * 3; // مجموع 3 درجات
+            const percentage = max > 0 ? Math.round((total / max) * 100) : 0;
+            
+            rows += `
+                <tr>
+                    <td>${student.name}</td>
+                    <td>${student.class}</td>
+                    <td>${student.section}</td>
+                    <td>${month1} (من ${settings.course2Max || 100})</td>
+                    <td>${month2} (من ${settings.course2Max || 100})</td>
+                    <td>${effort} (من ${settings.course2Max || 100})</td>
+                    <td style="font-weight: bold;">${total}</td>
+                    <td>${percentage}%</td>
+                </tr>
+            `;
+        });
+    }
+    else if (type === 'final') {
+        headers = `
+            <tr>
+                <th>اسم الطالب</th>
+                <th>الصف</th>
+                <th>الشعبة</th>
+                <th>نصف السنة</th>
+                <th>السعي السنوي</th>
+                <th>النهائية</th>
+                <th>المجموع</th>
+                <th>المعدل النهائي</th>
+                <th>الحالة</th>
+            </tr>
+        `;
+        
+        students.forEach(student => {
+            const grades = student.grades || {};
+            const midterm = grades.midterm || {};
+            const final = grades.final || {};
+            
+            const midtermGrade = midterm.exam || 0;
+            const yearlyEffort = final.yearlyEffort || 0;
+            const finalExam = final.exam || 0;
+            const total = midtermGrade + yearlyEffort + finalExam;
+            
+            const finalGrade = calculateFinalGrade(student);
+            const status = finalGrade >= settings.passingGrade ? 
+                `<span style="color: #2ecc71; font-weight: bold;">ناجح</span>` : 
+                `<span style="color: #e74c3c; font-weight: bold;">راسب</span>`;
+            
+            rows += `
+                <tr>
+                    <td>${student.name}</td>
+                    <td>${student.class}</td>
+                    <td>${student.section}</td>
+                    <td>${midtermGrade} (من ${settings.midtermMax || 100})</td>
+                    <td>${yearlyEffort} (من ${settings.finalMax || 100})</td>
+                    <td>${finalExam} (من ${settings.finalMax || 100})</td>
+                    <td style="font-weight: bold;">${total}</td>
+                    <td style="font-weight: bold; font-size: 1.1rem;">${finalGrade}</td>
+                    <td>${status}</td>
+                </tr>
+            `;
+        });
+    }
+    
+    thead.innerHTML = headers;
+    tbody.innerHTML = rows;
+}
+
+function searchResults(type, query) {
+    const rows = document.querySelectorAll(`#${type}-tbody tr`);
+    query = query.toLowerCase();
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(query) ? '' : 'none';
+    });
+}
+
+// === دوال التصدير والطباعة ===
+function printResults() {
+    if (students.length === 0) {
+        showNotification('لا توجد نتائج للطباعة', 'warning');
+        return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    const today = new Date().toLocaleDateString('ar-SA');
+    
+    let printContent = `
+        <html dir="rtl">
+        <head>
+            <title>نتائج الطلاب - ${settings.schoolName}</title>
+            <style>
+                body { font-family: 'Arial', sans-serif; margin: 20px; }
+                .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+                h1 { color: #2c3e50; margin: 0; }
+                h2 { color: #3498db; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th { background-color: #2c3e50; color: white; padding: 12px; text-align: center; border: 1px solid #ddd; }
+                td { padding: 10px; text-align: center; border: 1px solid #ddd; }
+                .footer { margin-top: 30px; text-align: left; font-size: 12px; color: #666; }
+                .passed { color: #27ae60; font-weight: bold; }
+                .failed { color: #e74c3c; font-weight: bold; }
+                @media print {
+                    body { margin: 0; }
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>${settings.schoolName}</h1>
+                <h2>نتائج الطلاب للعام الدراسي ${settings.academicYear}</h2>
+                <p>تاريخ الطباعة: ${today}</p>
+            </div>
+    `;
+
+    // إضافة جميع الجداول الثلاثة
+    const resultTypes = ['course1', 'course2', 'final'];
+    const typeNames = {
+        'course1': 'الكورس الأول',
+        'course2': 'الكورس الثاني', 
+        'final': 'الدرجات النهائية'
+    };
+
+    resultTypes.forEach(type => {
+        printContent += `<h3 style="margin-top: 30px; color: #2c3e50;">${typeNames[type]}</h3>`;
+        
+        if (type === 'course1' || type === 'course2') {
+            printContent += `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>اسم الطالب</th>
+                            <th>الصف</th>
+                            <th>الشعبة</th>
+                            <th>الشهر الأول</th>
+                            <th>الشهر الثاني</th>
+                            <th>السعي</th>
+                            <th>المجموع</th>
+                            <th>النسبة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            students.forEach(student => {
+                const grades = student.grades || {};
+                const period = grades[type] || {};
+                const month1 = period.month1 || 0;
+                const month2 = period.month2 || 0;
+                const effort = period.effort || 0;
+                const total = month1 + month2 + effort;
+                const max = (settings[type + 'Max'] || 100) * 3;
+                const percentage = max > 0 ? Math.round((total / max) * 100) : 0;
+                
+                printContent += `
+                    <tr>
+                        <td>${student.name}</td>
+                        <td>${student.class}</td>
+                        <td>${student.section}</td>
+                        <td>${month1}</td>
+                        <td>${month2}</td>
+                        <td>${effort}</td>
+                        <td>${total}</td>
+                        <td>${percentage}%</td>
+                    </tr>
+                `;
+            });
+            
+            printContent += `</tbody></table>`;
+        }
+        else if (type === 'final') {
+            printContent += `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>اسم الطالب</th>
+                            <th>الصف</th>
+                            <th>الشعبة</th>
+                            <th>نصف السنة</th>
+                            <th>السعي السنوي</th>
+                            <th>النهائية</th>
+                            <th>المجموع</th>
+                            <th>المعدل النهائي</th>
+                            <th>الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            students.forEach(student => {
+                const grades = student.grades || {};
+                const midterm = grades.midterm || {};
+                const final = grades.final || {};
+                
+                const midtermGrade = midterm.exam || 0;
+                const yearlyEffort = final.yearlyEffort || 0;
+                const finalExam = final.exam || 0;
+                const total = midtermGrade + yearlyEffort + finalExam;
+                
+                const finalGrade = calculateFinalGrade(student);
+                const status = finalGrade >= settings.passingGrade ? 
+                    `<span class="passed">ناجح</span>` : 
+                    `<span class="failed">راسب</span>`;
+
+                printContent += `
+                    <tr>
+                        <td>${student.name}</td>
+                        <td>${student.class}</td>
+                        <td>${student.section}</td>
+                        <td>${midtermGrade}</td>
+                        <td>${yearlyEffort}</td>
+                        <td>${finalExam}</td>
+                        <td>${total}</td>
+                        <td>${finalGrade}</td>
+                        <td>${status}</td>
+                    </tr>
+                `;
+            });
+            
+            printContent += `</tbody></table>`;
+        }
+    });
+
+    printContent += `
+            <div class="footer">
+                <p>درجة النجاح: ${settings.passingGrade}</p>
+                <p>إجمالي عدد الطلاب: ${students.length}</p>
+                <p>تم الإنشاء بواسطة نظام إدارة درجات الطلاب</p>
+            </div>
+            <div class="no-print" style="margin-top: 20px; text-align: center;">
+                <button onclick="window.print()" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    طباعة
+                </button>
+                <button onclick="window.close()" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+                    إغلاق
+                </button>
+            </div>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    showNotification('تم فتح نافذة الطباعة', 'info');
+}
+
+function exportResultsToExcel() {
+    if (students.length === 0) {
+        showNotification('لا توجد نتائج للتصدير', 'warning');
+        return;
+    }
+
+    // إنشاء مصنف جديد
+    const workbook = XLSX.utils.book_new();
+    
+    // تصدير الكورس الأول
+    const course1Data = students.map(student => {
+        const grades = student.grades || {};
+        const course1 = grades.course1 || {};
+        const month1 = course1.month1 || 0;
+        const month2 = course1.month2 || 0;
+        const effort = course1.effort || 0;
+        const total = month1 + month2 + effort;
+        const max = (settings.course1Max || 100) * 3;
+        const percentage = max > 0 ? Math.round((total / max) * 100) : 0;
+        
+        return [
+            student.name,
+            student.class,
+            student.section,
+            month1,
+            month2,
+            effort,
+            total,
+            percentage + '%'
+        ];
+    });
+    
+    const course1Sheet = XLSX.utils.aoa_to_sheet([
+        ['اسم الطالب', 'الصف', 'الشعبة', 'الشهر الأول', 'الشهر الثاني', 'السعي الأول', 'المجموع', 'النسبة'],
+        ...course1Data
+    ]);
+    XLSX.utils.book_append_sheet(workbook, course1Sheet, 'الكورس الأول');
+    
+    // تصدير الكورس الثاني
+    const course2Data = students.map(student => {
+        const grades = student.grades || {};
+        const course2 = grades.course2 || {};
+        const month1 = course2.month1 || 0;
+        const month2 = course2.month2 || 0;
+        const effort = course2.effort || 0;
+        const total = month1 + month2 + effort;
+        const max = (settings.course2Max || 100) * 3;
+        const percentage = max > 0 ? Math.round((total / max) * 100) : 0;
+        
+        return [
+            student.name,
+            student.class,
+            student.section,
+            month1,
+            month2,
+            effort,
+            total,
+            percentage + '%'
+        ];
+    });
+    
+    const course2Sheet = XLSX.utils.aoa_to_sheet([
+        ['اسم الطالب', 'الصف', 'الشعبة', 'الشهر الأول', 'الشهر الثاني', 'السعي الثاني', 'المجموع', 'النسبة'],
+        ...course2Data
+    ]);
+    XLSX.utils.book_append_sheet(workbook, course2Sheet, 'الكورس الثاني');
+    
+    // تصدير النتائج النهائية
+    const finalData = students.map(student => {
+        const grades = student.grades || {};
+        const midterm = grades.midterm || {};
+        const final = grades.final || {};
+        
+        const midtermGrade = midterm.exam || 0;
+        const yearlyEffort = final.yearlyEffort || 0;
+        const finalExam = final.exam || 0;
+        const total = midtermGrade + yearlyEffort + finalExam;
+        const finalGrade = calculateFinalGrade(student);
+        const status = finalGrade >= settings.passingGrade ? 'ناجح' : 'راسب';
+        
+        return [
+            student.name,
+            student.class,
+            student.section,
+            midtermGrade,
+            yearlyEffort,
+            finalExam,
+            total,
+            finalGrade,
+            status
+        ];
+    });
+    
+    const finalSheet = XLSX.utils.aoa_to_sheet([
+        ['اسم الطالب', 'الصف', 'الشعبة', 'نصف السنة', 'السعي السنوي', 'النهائية', 'المجموع', 'المعدل النهائي', 'الحالة'],
+        ...finalData
+    ]);
+    XLSX.utils.book_append_sheet(workbook, finalSheet, 'الدرجات النهائية');
+    
+    const fileName = `نتائج_الطلاب_${settings.schoolName}_${new Date().toLocaleDateString('ar-SA')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+    showNotification('تم تصدير النتائج إلى Excel بنجاح', 'success');
+}
+
+function exportToPDF() {
+    if (students.length === 0) {
+        showNotification('لا توجد نتائج للتصدير', 'warning');
+        return;
+    }
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // العنوان
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.text(settings.schoolName, 105, 15, null, null, 'center');
+        
+        doc.setFontSize(14);
+        doc.text(`نتائج الطلاب - ${settings.academicYear}`, 105, 25, null, null, 'center');
+        
+        doc.setFontSize(10);
+        doc.text(`تاريخ التصدير: ${new Date().toLocaleDateString('ar-SA')}`, 105, 35, null, null, 'center');
+        
+        // إعداد البيانات للجدول النهائي
+        const tableData = students.map(student => {
+            const finalGrade = calculateFinalGrade(student);
+            const grades = student.grades || {};
+            const midterm = grades.midterm || {};
+            const final = grades.final || {};
+            
+            const midtermGrade = midterm.exam || 0;
+            const yearlyEffort = final.yearlyEffort || 0;
+            const finalExam = final.exam || 0;
+            const total = midtermGrade + yearlyEffort + finalExam;
+            const status = finalGrade >= settings.passingGrade ? 'ناجح' : 'راسب';
+            
+            return [
+                student.name,
+                student.class,
+                student.section,
+                midtermGrade.toString(),
+                yearlyEffort.toString(),
+                finalExam.toString(),
+                total.toString(),
+                finalGrade.toString(),
+                status
+            ];
+        });
+        
+        // إضافة الجدول النهائي
+        doc.autoTable({
+            head: [['اسم الطالب', 'الصف', 'الشعبة', 'نصف السنة', 'السعي السنوي', 'النهائية', 'المجموع', 'المعدل', 'الحالة']],
+            body: tableData,
+            startY: 45,
+            theme: 'grid',
+            headStyles: { fillColor: [44, 62, 80], textColor: 255, fontStyle: 'bold' },
+            styles: { font: 'helvetica', fontSize: 8, textColor: 50 },
+            columnStyles: {
+                0: { cellWidth: 35 },
+                8: { cellWidth: 15 }
+            }
+        });
+        
+        // معلومات إضافية في الأسفل
+        const finalY = doc.lastAutoTable.finalY || 100;
+        doc.setFontSize(10);
+        doc.text(`إجمالي عدد الطلاب: ${students.length}`, 20, finalY + 15);
+        doc.text(`درجة النجاح: ${settings.passingGrade}`, 20, finalY + 25);
+        doc.text(`النسبة المئوية للنجاح: ${calculatePassRate()}%`, 20, finalY + 35);
+        
+        // حفظ الملف
+        const fileName = `نتائج_الطلاب_${settings.schoolName}_${new Date().toLocaleDateString('ar-SA')}.pdf`;
+        doc.save(fileName);
+        showNotification('تم تصدير النتائج إلى PDF بنجاح', 'success');
+    } catch (error) {
+        console.error('خطأ في تصدير PDF:', error);
+        showNotification('حدث خطأ في تصدير PDF', 'error');
+    }
+}
+
+// === دوال الحساب ===
+function calculateFinalGrade(student) {
+    if (!student.grades) return 0;
+    
+    const grades = student.grades;
+    let finalGrade = 0;
+    
+    // حساب الكورس الأول
+    if (grades.course1) {
+        const course1Month1 = grades.course1.month1 || 0;
+        const course1Month2 = grades.course1.month2 || 0;
+        const course1Effort = grades.course1.effort || 0;
+        const course1Total = course1Month1 + course1Month2 + course1Effort;
+        
+        // تحويل الدرجة إلى نسبة مئوية بناءً على الدرجة القصوى للإعدادات
+        const course1Max = (settings.course1Max || 100) * 3;
+        const course1Percentage = course1Max > 0 ? (course1Total / course1Max) * 100 : 0;
+        finalGrade += course1Percentage * (settings.course1Weight / 100);
+    }
+    
+    // حساب نصف السنة
+    if (grades.midterm) {
+        const midtermTotal = grades.midterm.exam || 0;
+        // تحويل الدرجة إلى نسبة مئوية بناءً على الدرجة القصوى للإعدادات
+        const midtermMax = settings.midtermMax || 100;
+        const midtermPercentage = midtermMax > 0 ? (midtermTotal / midtermMax) * 100 : 0;
+        finalGrade += midtermPercentage * (settings.midtermWeight / 100);
+    }
+    
+    // حساب الكورس الثاني
+    if (grades.course2) {
+        const course2Month1 = grades.course2.month1 || 0;
+        const course2Month2 = grades.course2.month2 || 0;
+        const course2Effort = grades.course2.effort || 0;
+        const course2Total = course2Month1 + course2Month2 + course2Effort;
+        
+        // تحويل الدرجة إلى نسبة مئوية بناءً على الدرجة القصوى للإعدادات
+        const course2Max = (settings.course2Max || 100) * 3;
+        const course2Percentage = course2Max > 0 ? (course2Total / course2Max) * 100 : 0;
+        finalGrade += course2Percentage * (settings.course2Weight / 100);
+    }
+    
+    // حساب النهائية
+    if (grades.final) {
+        const finalYearlyEffort = grades.final.yearlyEffort || 0;
+        const finalExam = grades.final.exam || 0;
+        const finalTotal = finalYearlyEffort + finalExam;
+        
+        // تحويل الدرجة إلى نسبة مئوية بناءً على الدرجة القصوى للإعدادات
+        const finalMax = (settings.finalMax || 100) * 2;
+        const finalPercentage = finalMax > 0 ? (finalTotal / finalMax) * 100 : 0;
+        finalGrade += finalPercentage * (settings.finalWeight / 100);
+    }
+    
+    return Math.min(100, Math.round(finalGrade * 10) / 10); // تقريب لأقرب منزلة عشرية
+}
+
+function calculatePeriodTotal(periodGrades) {
+    if (!periodGrades) return 0;
+    
+    if (periodGrades.month1 !== undefined) {
+        return (periodGrades.month1 || 0) + (periodGrades.month2 || 0) + (periodGrades.effort || 0);
+    } else if (periodGrades.exam !== undefined) {
+        return periodGrades.exam || 0;
+    } else if (periodGrades.yearlyEffort !== undefined) {
+        return (periodGrades.yearlyEffort || 0) + (periodGrades.exam || 0);
+    }
+    return 0;
+}
+
+function calculatePassRate() {
+    if (students.length === 0) return 0;
+    
+    let passCount = 0;
+    students.forEach(student => {
+        const finalGrade = calculateFinalGrade(student);
+        if (finalGrade >= settings.passingGrade) {
+            passCount++;
+        }
+    });
+    
+    return Math.round((passCount / students.length) * 100);
+}
+
+// === دوال المعلومات ===
+function updateDashboard() {
+    document.getElementById('totalStudents').textContent = students.length;
+    document.getElementById('passRate').textContent = calculatePassRate() + '%';
+    
+    let passCount = 0;
+    students.forEach(student => {
+        const finalGrade = calculateFinalGrade(student);
+        if (finalGrade >= settings.passingGrade) {
+            passCount++;
+        }
+    });
+    
+    document.getElementById('failCount').textContent = students.length - passCount;
+    
+    const sections = new Set(students.map(s => s.section));
+    document.getElementById('classesCount').textContent = sections.size;
+}
+
+function updateReports() {
+    if (students.length === 0) {
+        document.getElementById('topGrade').textContent = '-';
+        document.getElementById('topStudent').textContent = 'لا توجد بيانات';
+        document.getElementById('lowestGrade').textContent = '-';
+        document.getElementById('lowestStudent').textContent = 'لا توجد بيانات';
+        document.getElementById('averageGrade').textContent = '0';
+        document.getElementById('attendanceRate').textContent = '0%';
+        return;
+    }
+
+    // حساب أعلى وأقل درجة
+    let topGrade = 0;
+    let topStudent = '';
+    let lowestGrade = 100;
+    let lowestStudent = '';
+    let totalGrade = 0;
+
+    students.forEach(student => {
+        const finalGrade = calculateFinalGrade(student);
+        totalGrade += finalGrade;
+
+        if (finalGrade > topGrade) {
+            topGrade = finalGrade;
+            topStudent = student.name;
+        }
+
+        if (finalGrade < lowestGrade) {
+            lowestGrade = finalGrade;
+            lowestStudent = student.name;
+        }
+    });
+
+    const averageGrade = Math.round(totalGrade / students.length);
+
+    document.getElementById('topGrade').textContent = topGrade;
+    document.getElementById('topStudent').textContent = topStudent;
+    document.getElementById('lowestGrade').textContent = lowestGrade;
+    document.getElementById('lowestStudent').textContent = lowestStudent;
+    document.getElementById('averageGrade').textContent = averageGrade;
+    document.getElementById('attendanceRate').textContent = calculatePassRate() + '%';
+    
+    // تحديث الرسم البياني
+    updatePerformanceChart();
+}
+
+function initPerformanceChart() {
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    window.performanceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['الكورس الأول', 'نصف السنة', 'الكورس الثاني', 'النهائية'],
+            datasets: [{
+                label: 'المعدل العام',
+                data: [0, 0, 0, 0],
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                borderWidth: 2,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'تطور الأداء خلال العام الدراسي'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'المعدل'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updatePerformanceChart() {
+    if (students.length === 0) return;
+    
+    let course1Avg = 0;
+    let midtermAvg = 0;
+    let course2Avg = 0;
+    let finalAvg = 0;
+    
+    students.forEach(student => {
+        const grades = student.grades || {};
+        
+        if (grades.course1) {
+            const course1Total = calculatePeriodTotal(grades.course1);
+            const max = (settings.course1Max || 100) * 3;
+            course1Avg += max > 0 ? (course1Total / max) * 100 : 0;
+        }
+        
+        if (grades.midterm) {
+            const midtermTotal = calculatePeriodTotal(grades.midterm);
+            const max = settings.midtermMax || 100;
+            midtermAvg += max > 0 ? (midtermTotal / max) * 100 : 0;
+        }
+        
+        if (grades.course2) {
+            const course2Total = calculatePeriodTotal(grades.course2);
+            const max = (settings.course2Max || 100) * 3;
+            course2Avg += max > 0 ? (course2Total / max) * 100 : 0;
+        }
+        
+        if (grades.final) {
+            const finalTotal = calculatePeriodTotal(grades.final);
+            const max = (settings.finalMax || 100) * 2;
+            finalAvg += max > 0 ? (finalTotal / max) * 100 : 0;
+        }
+    });
+    
+    course1Avg = Math.round(course1Avg / students.length);
+    midtermAvg = Math.round(midtermAvg / students.length);
+    course2Avg = Math.round(course2Avg / students.length);
+    finalAvg = Math.round(finalAvg / students.length);
+    
+    window.performanceChart.data.datasets[0].data = [course1Avg, midtermAvg, course2Avg, finalAvg];
+    window.performanceChart.update();
+}
+
+// === دوال الإعدادات ===
+function saveTeacherInfo() {
+    teacherInfo = {
+        name: document.getElementById('teacherName').value.trim() || 'المعلم أحمد',
+        email: document.getElementById('teacherEmail').value.trim() || 'teacher@school.com',
+        phone: document.getElementById('teacherPhone').value.trim() || '0512345678',
+        school: document.getElementById('teacherSchool').value.trim() || 'مدرسة النموذج',
+        subjects: document.getElementById('teacherSubjects').value.trim() || 'الرياضيات, العلوم, اللغة العربية'
+    };
+
+    localStorage.setItem('teacherInfo', JSON.stringify(teacherInfo));
+    document.getElementById('userName').textContent = teacherInfo.name;
+    showNotification('تم حفظ معلومات الحساب بنجاح', 'success');
+}
+
+function loadTeacherInfo() {
+    document.getElementById('teacherName').value = teacherInfo.name;
+    document.getElementById('teacherEmail').value = teacherInfo.email;
+    document.getElementById('teacherPhone').value = teacherInfo.phone;
+    document.getElementById('teacherSchool').value = teacherInfo.school;
+    document.getElementById('teacherSubjects').value = teacherInfo.subjects;
+    document.getElementById('userName').textContent = teacherInfo.name;
+}
+
+function saveSettings() {
+    settings = {
+        passingGrade: parseInt(document.getElementById('passingGrade').value) || 50,
+        maxGrade: parseInt(document.getElementById('maxGrade').value) || 100,
+        course1Weight: parseInt(document.getElementById('course1Weight').value) || 20,
+        midtermWeight: parseInt(document.getElementById('midtermWeight').value) || 25,
+        course2Weight: parseInt(document.getElementById('course2Weight').value) || 20,
+        finalWeight: parseInt(document.getElementById('finalWeight').value) || 35,
+        course1Max: parseInt(document.getElementById('course1Max').value) || 100,
+        course2Max: parseInt(document.getElementById('course2Max').value) || 100,
+        midtermMax: parseInt(document.getElementById('midtermMax').value) || 100,
+        finalMax: parseInt(document.getElementById('finalMax').value) || 100,
+        schoolName: document.getElementById('schoolName').value.trim() || 'مدرسة النموذج',
+        academicYear: document.getElementById('academicYear').value.trim() || '2023-2024',
+        autoCalculate: document.getElementById('autoCalculate').checked,
+        showGrades: document.getElementById('showGrades').checked
+    };
+
+    localStorage.setItem('settings', JSON.stringify(settings));
+    showNotification('تم حفظ الإعدادات بنجاح', 'success');
+    initGradesPage();
+    initResultsPage();
+    updateDashboard();
+}
+
+function loadSettings() {
+    document.getElementById('passingGrade').value = settings.passingGrade;
+    document.getElementById('maxGrade').value = settings.maxGrade || 100;
+    document.getElementById('course1Weight').value = settings.course1Weight;
+    document.getElementById('midtermWeight').value = settings.midtermWeight;
+    document.getElementById('course2Weight').value = settings.course2Weight;
+    document.getElementById('finalWeight').value = settings.finalWeight;
+    document.getElementById('course1Max').value = settings.course1Max || 100;
+    document.getElementById('course2Max').value = settings.course2Max || 100;
+    document.getElementById('midtermMax').value = settings.midtermMax || 100;
+    document.getElementById('finalMax').value = settings.finalMax || 100;
+    document.getElementById('schoolName').value = settings.schoolName;
+    document.getElementById('academicYear').value = settings.academicYear;
+    document.getElementById('autoCalculate').checked = settings.autoCalculate !== false;
+    document.getElementById('showGrades').checked = settings.showGrades !== false;
+}
+
+// === دوال المساعدة ===
+function showNotification(message, type = 'info') {
+    const notification = document.getElementById('notification');
+    notification.textContent = message;
+    notification.className = `notification ${type}`;
+    notification.style.display = 'block';
+    
+    setTimeout(() => {
+        notification.style.display = 'none';
+    }, 3500);
+}
+
+function resetAllData() {
+    if (confirm('هل أنت متأكد من مسح جميع البيانات؟ هذا الإجراء لا يمكن التراجع عنه.')) {
+        students = [];
+        localStorage.removeItem('students');
+        localStorage.removeItem('settings');
+        localStorage.removeItem('teacherInfo');
+        
+        // إعادة تحميل الإعدادات الافتراضية
+        settings = {
+            passingGrade: 50,
+            maxGrade: 100,
+            course1Weight: 20,
+            midtermWeight: 25,
+            course2Weight: 20,
+            finalWeight: 35,
+            course1Max: 100,
+            course2Max: 100,
+            midtermMax: 100,
+            finalMax: 100,
+            schoolName: 'مدرسة النموذج',
+            academicYear: '2023-2024',
+            autoCalculate: true,
+            showGrades: true
+        };
+        
+        teacherInfo = {
+            name: 'المعلم أحمد',
+            email: 'teacher@school.com',
+            phone: '0512345678',
+            school: 'مدرسة النموذج',
+            subjects: 'الرياضيات, العلوم, اللغة العربية'
+        };
+        
+        // تحديث الواجهة
+        renderStudentsTable();
+        updateDashboard();
+        initGradesPage();
+        initResultsPage();
+        loadSettings();
+        loadTeacherInfo();
+        
+        showNotification('تم مسح جميع البيانات', 'success');
+    }
+}
+
+// === دوال عامة للوصول من HTML ===
+window.editStudent = function(index) {
+    openStudentModal(index);
+};
+
+window.deleteStudent = function(index) {
+    if (confirm('هل أنت متأكد من حذف هذا الطالب؟')) {
+        students.splice(index, 1);
+        localStorage.setItem('students', JSON.stringify(students));
+        
+        renderStudentsTable();
+        updateDashboard();
+        initGradesPage();
+        initResultsPage();
+        updateReports();
+        
+        showNotification('تم حذف الطالب بنجاح', 'success');
+    }
+};
+
+function getPeriodName(periodId) {
+    const periods = {
+        'course1': 'الكورس الأول',
+        'midterm': 'نصف السنة',
+        'course2': 'الكورس الثاني',
+        'final': 'النهائية'
+    };
+    return periods[periodId] || periodId;
+}
+    </script>
+</body>
+</html>
